@@ -3,14 +3,14 @@
 
 """
 Author: Prasanna Venkadesh
+Modified by: Jorge Rios (@J29Rios)
 License: Free Software (GPL V3)
 
 Running this program will listen for the tweets on User's timeline using Twitters Streaming API.
-If there are any retweets or favorites on the tweet of the user,
-a buzzer beep will be played on the Arduino connected with the
+If there are any retweets or favorites on the tweet of the user, 
+a 16x2 Liquid Crystal Display (LCD) will be show the tweet on the Arduino connected with the
 computer.
 """
-
 
 # import required modules
 from tweepy.streaming import StreamListener
@@ -26,7 +26,9 @@ import sys
 try:
     serial_port = sys.argv[1]
     baud_rate = 115200
+
     arduino_serial_connection = serial.Serial(serial_port, baud_rate)
+
     print "Connection establised on %s" % serial_port
     arduino_serial_connection.write('99')
 except IndexError:
@@ -47,11 +49,11 @@ screen_name = 'YOUR_TWITTER_HANDLE_WITHOUT_@_SYMBOL_HERE'
 
 class StdOutListener(StreamListener):
 
-    def play_sound(self):
-        # plays a beep on Arduino to notify the user
-        arduino_serial_connection.write('1')
-        sleep(4)
-        arduino_serial_connection.write('99')
+    #Data to Arduino
+    def play_sound(self, text):
+        # shows the tweet on LCD
+        arduino_serial_connection.write(text)       
+        sleep(2)
 
     def on_data(self, data):
 
@@ -62,16 +64,18 @@ class StdOutListener(StreamListener):
                 for user in json_data.get('entities').get('user_mentions'):
                     if user.get('screen_name') == screen_name:
                         print "You have a RT / MENTION"
-                        print json_data.get('text')
-                        self.play_sound()
+                        print json_data.get('text') #Unicode
+                        # Unicode to String
+                        u = json_data.get('text')
+                        s = u.encode('utf8')                                               
+                        self.play_sound(s)
             elif json_data.get('event'):
                 if json_data.get('target').get('screen_name') == screen_name:
                     print "%s (%s) has %sd," % (json_data.get('source').get('name'),
                                                 json_data.get('source').get('screen_name'),
                                                 json_data.get('event'))
                     print json_data.get('target_object').get('text')
-                    self.play_sound()
-
+                    self.play_sound(json_data.get('target_object').get('text'))
         except BaseException, be:
             print be.message
 
@@ -84,8 +88,9 @@ class StdOutListener(StreamListener):
 if __name__ == '__main__':
 
     listener = StdOutListener()
+
     auth = OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
-    stream = Stream(auth, listener)
 
+    stream = Stream(auth, listener)
     stream.userstream()
